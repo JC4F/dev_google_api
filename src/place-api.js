@@ -1,14 +1,12 @@
 require("dotenv").config();
-const express = require("express");
 const axios = require("axios");
-const countries = require("node-countries");
 
-const app = express();
 const apiKey = process.env.GOOGLE_API_KEY;
-const searchQuery = "tourist attractions in Nghe An";
+const searchQuery = "tourist attractions in ";
 const resultsPerPage = 20; // Số lượng kết quả trả về trên mỗi trang
 
-app.get("/dulich", async (req, res) => {
+const handleSearchPlace = async (req, res) => {
+  const { place } = req.params;
   try {
     let allResults = [];
 
@@ -19,7 +17,7 @@ app.get("/dulich", async (req, res) => {
         {
           params: {
             key: apiKey,
-            query: searchQuery,
+            query: searchQuery + place,
             pagetoken: nextPageToken,
           },
         }
@@ -59,15 +57,7 @@ app.get("/dulich", async (req, res) => {
     console.error("Error occurred:", error);
     res.status(500).json({ error: "An error occurred" });
   }
-});
-
-// Route để lấy danh sách tỉnh thành của quốc gia dựa trên mã quốc gia
-app.get("/countries/:countryCode", (req, res) => {
-  const { countryCode } = req.params;
-  const provinces = countries.default[countryCode].provinces.map((x) => x.name);
-
-  res.json({ provinces, length: provinces.length });
-});
+};
 
 async function getPlacePhotos(placeId) {
   const response = await axios.get(
@@ -89,6 +79,4 @@ function getPhotoUrl(photoReference) {
   return `https://maps.googleapis.com/maps/api/place/photo?maxwidth=800&photoreference=${photoReference}&key=${apiKey}`;
 }
 
-app.listen(3000, () => {
-  console.log("Server is running on port 3000");
-});
+module.exports = { handleSearchPlace };

@@ -3,7 +3,7 @@ const fs = require("fs");
 
 const URL = "https://www.google.com/travel/things-to-do";
 
-const crawlWebsite = async function (province) {
+const crawlWebsite = async function (place) {
   try {
     const browser = await puppeteer.launch();
     const page = await browser.newPage();
@@ -20,7 +20,7 @@ const crawlWebsite = async function (province) {
     await page.waitForSelector(inputSelector);
 
     // Nhập giá trị vào ô input
-    await page.type(inputSelector, `Du lịch ${province}`);
+    await page.type(inputSelector, `Du lịch ${place}`);
 
     // click vào ô input bởi vì nó đang bị click trên URL
     await page.click(inputSelector);
@@ -97,7 +97,16 @@ const crawlWebsite = async function (province) {
   }
 };
 
-module.exports = crawlWebsite;
+const handleCrawl = async (req, res) => {
+  const { place } = req.params;
+  const result = await crawlWebsite(place);
+
+  console.log(result.length);
+
+  res.json(result);
+};
+
+module.exports = { handleCrawl };
 
 // Sử dụng hàm crawlWebsite để crawl một trang web
 // crawlWebsite("https://www.google.com/travel/things-to-do")
