@@ -1,6 +1,7 @@
 require("dotenv").config();
 const express = require("express");
 const axios = require("axios");
+const countries = require("node-countries");
 
 const app = express();
 const apiKey = process.env.GOOGLE_API_KEY;
@@ -49,18 +50,6 @@ app.get("/dulich", async (req, res) => {
 
     const resultsWithIconUrls = resultsWithImages.map((result) => ({
       ...result,
-      // formatted_address: result.formatted_address,
-      // geometry: result.geometry,
-      // name: result.name,
-      // opening_hours: result.opening_hours,
-      // place_id: result.place_id,
-      // plus_code: result.plus_code,
-      // rating: result.rating,
-      // reference: result.reference,
-      // types: result.types,
-      // user_ratings_total: result.user_ratings_total,
-      // representImage: result.representImage,
-      // relatedImages: result.relatedImages,
     }));
 
     console.log(resultsWithIconUrls.length);
