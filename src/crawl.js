@@ -1,5 +1,7 @@
 const puppeteer = require("puppeteer");
 const fs = require("fs");
+const { searchCoordinates } = require("./utils/geo");
+const { getCoordinates } = require("./utils/openstreetmap");
 
 const URL = "https://www.google.com/travel/things-to-do";
 
@@ -89,6 +91,15 @@ const crawlWebsite = async function (place) {
 
       return dataTemp;
     });
+
+    // const dataExtraGeo = await Promise.all(
+    //   data.map(async (item) => ({
+    //     ...item,
+    //     location: await getCoordinates(`${item.name} in ${place}`),
+    //   }))
+    // );
+
+    // return dataExtraGeo;
 
     return data;
     // await browser.close();
