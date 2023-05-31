@@ -4,10 +4,17 @@ const { searchCoordinates } = require("./utils/geo");
 const { getCoordinates } = require("./utils/openstreetmap");
 
 const URL = "https://www.google.com/travel/things-to-do";
+const PAGE_lOAD_DELAY = 2000;
+const IMAGE_LOAD_DELAY = 1000;
+const BUTTON_CLICK_DELAY = 300;
 
 const crawlWebsite = async function (place) {
   try {
-    const browser = await puppeteer.launch();
+    const browser = await puppeteer.launch({
+      headless: true,
+      defaultViewport: { width: 1700, height: 950 },
+      timeout: 3600000 * 10,
+    });
     const page = await browser.newPage();
 
     // // Bắt sự kiện console.log trong trình duyệt
@@ -37,7 +44,7 @@ const crawlWebsite = async function (place) {
     await page.click(".GtiGue.wB1u7d button");
 
     // Chờ một khoảng thời gian sau khi click (ví dụ: 3 giây)
-    await new Promise((r) => setTimeout(r, 3000));
+    await new Promise((r) => setTimeout(r, PAGE_lOAD_DELAY));
 
     // Scroll to the end of the page
     await page.evaluate(async () => {
@@ -58,51 +65,96 @@ const crawlWebsite = async function (place) {
     });
 
     // Sử dụng page.evaluate để thực hiện các lệnh trong môi trường trình duyệt
-    const data = await page.evaluate(() => {
-      const listItem = document.querySelectorAll("div.f4hh3d[role='listitem']");
-      const dataTemp = Array.from(listItem).map((item) => {
-        const nameElement = item.querySelector("div.skFvHc.YmWhbc");
-        const ratingElement = item.querySelector("span.KFi5wf.lA0BZ");
-        const numOfVoteElement = item.querySelector("span.jdzyld.XLC8M");
-        const descriptionElement = item.querySelector("div.nFoFM");
-        const imageElement = item.querySelector("img");
-        console.log(
-          "🚀 ~ file: crawl.js:53 ~ dataTemp ~ imageElement:",
-          imageElement.src
+    const data = await page.evaluate(
+      async (IMAGE_LOAD_DELAY, BUTTON_CLICK_DELAY) => {
+        const listItem = document.querySelectorAll(
+          "div.f4hh3d[role='listitem']"
         );
-        // await new Promise((r) => setTimeout(r, 1000));
+        const dataTemp = [];
 
-        const name = nameElement ? nameElement.textContent : "";
-        const rating = ratingElement ? ratingElement.textContent : "";
-        const numOfVote = numOfVoteElement ? numOfVoteElement.textContent : "";
-        const description = descriptionElement
-          ? descriptionElement.textContent
-          : "";
-        const imageRepresent = imageElement ? imageElement.src : "";
+        for (let i = 0; i < listItem.length; i++) {
+          const item = listItem[i];
 
-        return {
-          name,
-          rating,
-          numOfVote,
-          description,
-          imageRepresent,
-        };
-      });
+          item.querySelector("img").click();
+          await new Promise((resolve) => setTimeout(resolve, IMAGE_LOAD_DELAY));
+          const buttonPrev = document.querySelector(
+            'div[jsname="rf24F"]:not([soy-skip]) button'
+          );
+          const buttonNext = document.querySelector(
+            'div[jsname="v6lL4e"]:not([soy-skip]) button'
+          );
+          const wrapperEle = document.querySelector(
+            'div[jsname="BEZjkb"] div[jsslot].NBZP0e.xbmkib'
+          );
+          if (wrapperEle) {
+            const lastChild = wrapperEle.lastElementChild;
+            const firstChild = wrapperEle.firstElementChild;
+            let rightAll = false,
+              leftAll = false;
 
-      return dataTemp;
-    });
+            if (buttonNext) {
+              while (true) {
+                if (!rightAll) buttonNext.click();
+                else buttonPrev.click();
+                await new Promise((resolve) =>
+                  setTimeout(resolve, BUTTON_CLICK_DELAY)
+                );
+                const containerRect = wrapperEle.getBoundingClientRect(); // Kích thước và vị trí của khung nhìn
+                const lastItemRect = lastChild.getBoundingClientRect(); // Kích thước và vị trí của phần tử cuối cùng
+                const firstItemRect = firstChild.getBoundingClientRect(); // Kích thước và vị trí của phần tử đầu tiên
 
-    // const dataExtraGeo = await Promise.all(
-    //   data.map(async (item) => ({
-    //     ...item,
-    //     location: await getCoordinates(`${item.name} in ${place}`),
-    //   }))
-    // );
+                // Kiểm tra xem phần tử cuối cùng đã được kéo vào khung nhìn hay chưa
+                if (lastItemRect.right <= containerRect.right) {
+                  rightAll = true;
+                }
 
-    // return dataExtraGeo;
+                // Kiểm tra xem phần tử đầu tiên đã được kéo vào khung nhìn hay chưa
+                if (firstItemRect.left >= containerRect.left) {
+                  leftAll = true;
+                }
+
+                if (rightAll && leftAll) break;
+              }
+            }
+          }
+          const imageWrappers = document.querySelectorAll("div.QtzoWd img");
+          const imageList = Array.from(imageWrappers).map((image) => image.src);
+
+          const nameElement = item.querySelector("div.skFvHc.YmWhbc");
+          const ratingElement = item.querySelector("span.KFi5wf.lA0BZ");
+          const numOfVoteElement = item.querySelector("span.jdzyld.XLC8M");
+          const descriptionElement = item.querySelector("div.nFoFM");
+          const imageElement = item.querySelector("img");
+
+          const name = nameElement ? nameElement.textContent : "";
+          const rating = ratingElement ? ratingElement.textContent : "";
+          const numOfVote = numOfVoteElement
+            ? numOfVoteElement.textContent
+            : "";
+          const description = descriptionElement
+            ? descriptionElement.textContent
+            : "";
+          const imageRepresent = imageElement ? imageElement.src : "";
+
+          dataTemp.push({
+            name,
+            rating,
+            numOfVote,
+            description,
+            imageRepresent,
+            imageList,
+          });
+        }
+
+        return dataTemp;
+      },
+      IMAGE_LOAD_DELAY,
+      BUTTON_CLICK_DELAY
+    );
 
     return data;
-    // await browser.close();
+
+    return data;
   } catch (error) {
     console.error("Error:", error.message);
   }
@@ -117,25 +169,34 @@ const handleCrawl = async (req, res) => {
   res.json(result);
 };
 
+// const dataExtraGeo = await Promise.all(
+//   data.map(async (item) => ({
+//     ...item,
+//     location: await getCoordinates(`${item.name} in ${place}`),
+//   }))
+// );
+
+// return dataExtraGeo;
+
 module.exports = { handleCrawl };
 
 // Sử dụng hàm crawlWebsite để crawl một trang web
-// crawlWebsite("https://www.google.com/travel/things-to-do")
-//   .then((data) => {
-//     console.log(data);
-//     console.log(data.length);
-//     if (data) {
-//       const jsonData = JSON.stringify(data, null, 2);
+crawlWebsite("Hà Tĩnh")
+  .then((data) => {
+    // console.log(data);
+    console.log(data.length);
+    if (data) {
+      const jsonData = JSON.stringify(data, null, 2);
 
-//       fs.writeFile("data.txt", jsonData, (err) => {
-//         if (err) {
-//           console.error("Error writing to file:", err);
-//         } else {
-//           console.log("Data written to file successfully.");
-//         }
-//       });
-//     }
-//   })
-//   .catch((error) => {
-//     console.error("Error:", error.message);
-//   });
+      fs.writeFile("data.txt", jsonData, (err) => {
+        if (err) {
+          console.error("Error writing to file:", err);
+        } else {
+          console.log("Data written to file successfully.");
+        }
+      });
+    }
+  })
+  .catch((error) => {
+    console.error("Error:", error.message);
+  });
